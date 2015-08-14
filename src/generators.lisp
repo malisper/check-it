@@ -412,15 +412,15 @@ generalizes a sigmoidal probabilistic activation function from 2 to N possible o
                                     (lambda () (call-next-method)))
         (setf recursive-depth old-depth)))))
 
-(defgeneric call-with-adjusted-bias (generator proceed)
+(defgeneric call-with-adjusted-bias (generator next)
   (:documentation "Strategies for managing growth of recursive generators."))
 
-(defmethod call-with-adjusted-bias ((generator custom-generator) proceed)
+(defmethod call-with-adjusted-bias ((generator custom-generator) next)
   (with-obvious-accessors (bias) generator
     (let ((old-bias bias))
       (setf bias (* bias *recursive-bias-decay*))
       (unwind-protect
-           (funcall proceed)
+           (funcall next)
         (setf bias old-bias)))))
 
 (defun make-list-generator-form (generator-function
@@ -614,7 +614,7 @@ generalizes a sigmoidal probabilistic activation function from 2 to N possible o
           (generator
            (let* ((gen-name (first exp)))
              `(funcall ,(get gen-name 'generator-form) ,@(rest exp))))
-          (macro
+          (generator-macro
            (expand-generator
             (funcall (get (first exp) 'genex-macro)
                      (rest exp))))
@@ -657,7 +657,7 @@ generalizes a sigmoidal probabilistic activation function from 2 to N possible o
 (defmacro def-genex-macro (name lambda-list &body body)
   "Define a code template to expand wherever a generator expression could appear."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (setf (get ',name 'genex-type) 'macro)
+     (setf (get ',name 'genex-type) 'generator-macro)
      (setf (get ',name 'genex-macro)
            (destructuring-lambda ,lambda-list
              ,@body))))

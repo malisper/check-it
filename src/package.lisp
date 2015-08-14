@@ -1,7 +1,7 @@
 (in-package :cl-user)
 
 (defpackage :check-it
-  (:use :cl :alexandria :optima)
+  (:use :cl :alexandria :optima :hu.dwim.walker :hu.dwim.def :contextl)
   (:export #:shrink
            #:shrink-and-trap-errors
 
@@ -43,7 +43,6 @@
            #:element
            #:elements
            #:guard
-           #:constructor
            #:slot-names
            #:slot-generators
 
