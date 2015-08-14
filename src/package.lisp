@@ -56,7 +56,8 @@
            #:register-package-regression-file
            #:regression-case
            #:check-it
-           #:with-generators))
+           #:with-tests
+           #:check-that))
 
 (in-package :check-it)
 
