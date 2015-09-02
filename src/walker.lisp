@@ -31,11 +31,15 @@
 ;; Any check-that should immediately return its value from the
 ;; test-block since we are only checking one check-that at a time.
 (def unwalker check-that-form (value)
-  `(return-from ,*test-block* ,(unwalk-form value)))
+  ;; We should only return when the test fails. This way it is
+  ;; possible to run a test multiple times within a loop.
+  `(unless ,(unwalk-form value) (return-from ,*test-block* nil)))
 
 (def macro with-tests (&body body &environment env)
   (with-active-layers (with-tests)
-    (let* ((ast (walk-form `(progn ,@body) :environment (make-walk-environment env)))
+    ;; The code should return T if the body runs through. That means
+    ;; no tests have failed since they will short circuit.
+    (let* ((ast (walk-form `(progn ,@body t) :environment (make-walk-environment env)))
            ;; Collect-variable-references is poorly named. It makes it
            ;; possible to obtain all of the ast nodes of a given type.
            (check-that-forms (collect-variable-references ast :type 'check-that-form))

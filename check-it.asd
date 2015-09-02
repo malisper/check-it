@@ -25,7 +25,7 @@
                          (:file "shrink")
                          (:file "check-it"))
             :serial t))
-  :depends-on (:alexandria :closer-mop :optima)
+  :depends-on (:alexandria :closer-mop :optima :hu.dwim.walker)
   :in-order-to ((test-op (load-op :check-it-test)))
   :perform (test-op :after (op c)
                     (funcall
