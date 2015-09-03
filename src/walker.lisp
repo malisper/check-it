@@ -3,6 +3,10 @@
 (defparameter *test-block* (gensym "TEST-BLOCK")
   "The symbol used to name the blocks for the tests.")
 
+(defparameter *check-that-num* (gensym "CHECK-THAT-NUM")
+  "The symbol that holds the value of the check that form that should
+   currently be running.")
+
 (def layer with-tests)
 
 (def form-class generator-form ()
@@ -10,7 +14,8 @@
    (gensym (gensym "GENERATOR-VALUE"))))
 
 (def form-class check-that-form ()
-  ((value nil :ast-link t)))
+  ((num)
+   (value nil :ast-link t)))
 
 (def (walker :in with-tests) generator
   (with-form-object (form 'generator-form -parent-)
@@ -30,10 +35,11 @@
 
 ;; Any check-that should immediately return its value from the
 ;; test-block since we are only checking one check-that at a time.
-(def unwalker check-that-form (value)
+(def unwalker check-that-form (num value)
   ;; We should only return when the test fails. This way it is
   ;; possible to run a test multiple times within a loop.
-  `(unless ,(unwalk-form value) (return-from ,*test-block* nil)))
+  `(unless (or (/= ,num ,*check-that-num*) ,(unwalk-form value))
+     (return-from ,*test-block* nil)))
 
 (def macro with-tests (&body body &environment env)
   (with-active-layers (with-tests)
@@ -42,34 +48,36 @@
     (let* ((ast (walk-form `(progn ,@body t) :environment (make-walk-environment env)))
            ;; Collect-variable-references is poorly named. It makes it
            ;; possible to obtain all of the ast nodes of a given type.
-           (check-that-forms (collect-variable-references ast :type 'check-that-form))
            (generator-forms  (collect-variable-references ast :type 'generator-form))
+           (generator `(generator (tuple ,@(mapcar (compose #'unwalk-form #'expr-of) generator-forms))))
            (gensyms (mapcar #'gensym-of generator-forms))
-           (generator `(generator (tuple ,@(mapcar (compose #'unwalk-form #'expr-of) generator-forms)))))
-      (duplicate ast generator check-that-forms gensyms))))
+           (check-that-forms (collect-variable-references ast :type 'check-that-form)))
+      (number-check-that-forms check-that-forms)
+      (generate-body ast generator gensyms check-that-forms))))
 
-(def function duplicate (ast generator check-that-forms gensyms)
-  "Duplicates AST N times, with only a single, but different
-   check-that in each one. GENERATOR is the generator expression that
-   should be used to generate all of the values. GENSYMS are the
-   symbols the values returned by GENERATOR should be bound to."
-  (once-only (generator)
-    `(progn
-       ,@(loop for check-that-form in check-that-forms
-               for gargs = (gensym "ARGS")
-               collect `(check-it% ',(source-of (value-of check-that-form))
-                                   ,generator
-                                   (lambda (,gargs)
-                                     (block ,*test-block*
-                                       (destructuring-bind ,gensyms ,gargs
-                                         (declare (ignorable ,@gensyms))
-                                         ;; Substitute nil for all of
-                                         ;; the check-that forms that
-                                         ;; are not eq to the one form
-                                         ;; we are leaving.
-                                         ,(unwalk-form (substitute-ast-if
-                                                        (walk-form nil)
-                                                        (lambda (form)
-                                                          (and (typep form 'check-that-form)
-                                                               (not (eq check-that-form form))))
-                                                        ast))))))))))
+(defun number-check-that-forms (forms)
+  "Numbers the check-that forms in FORMS."
+  (loop for form in forms
+        for i from 1
+        do (setf (num-of form) i)))
+
+(def function generate-body (ast generator gensyms check-that-forms)
+  "Generates the body of the with-tests form, given the walked AST,
+   the generator that should be used to generate all of the values,
+   the gensyms that those generated values should be bound to, and all
+   of the check-that forms in the with-tests form."
+  (with-gensyms (gcode gargs)
+    (once-only (generator)
+      `(loop for ,*check-that-num* from 1 to ,(length check-that-forms)
+             for ,gcode in '(,@(mapcar #'source-of check-that-forms))
+             do (check-it% ,gcode
+                           ,generator
+                           (lambda (,gargs)
+                             (block ,*test-block*
+                               (destructuring-bind ,gensyms ,gargs
+                                 (declare (ignorable ,@gensyms))
+                                 ;; Substitute nil for all of
+                                 ;; the check-that forms that
+                                 ;; are not eq to the one form
+                                 ;; we are leaving.
+                                 ,(unwalk-form ast)))))))))
