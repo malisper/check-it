@@ -1,7 +1,7 @@
 (in-package :cl-user)
 
 (defpackage :check-it
-  (:use :cl :alexandria :optima :hu.dwim.walker :hu.dwim.def :contextl)
+  (:use :cl :alexandria :optima :hu.dwim.walker :hu.dwim.def :contextl :clunit)
   (:export #:shrink
            #:shrink-and-trap-errors
 

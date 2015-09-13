@@ -1,11 +1,8 @@
 (in-package :check-it)
 
-(defparameter *test-block* (gensym "TEST-BLOCK")
-  "The symbol used to name the blocks for the tests.")
-
-(defparameter *check-that-num* (gensym "CHECK-THAT-NUM")
-  "The symbol that holds the value of the check that form that should
-   currently be running.")
+(defparameter *check-that-num* nil
+  "This variable will be bound to a gensym that will hold the value of
+   the check that form that should be running.")
 
 (def layer with-tests)
 
@@ -33,13 +30,10 @@
   (with-form-object (form 'check-that-form -parent-)
     (setf (value-of form) (hu.dwim.walker::recurse (cadr -form-)))))
 
-;; Any check-that should immediately return its value from the
-;; test-block since we are only checking one check-that at a time.
 (def unwalker check-that-form (num value)
-  ;; We should only return when the test fails. This way it is
-  ;; possible to run a test multiple times within a loop.
-  `(unless (or (/= ,num ,*check-that-num*) ,(unwalk-form value))
-     (return-from ,*test-block* nil)))
+  ;; When the number is zero we want to run all of the tests.
+  `(when (or (= ,*check-that-num* 0) (= ,*check-that-num* ,num))
+     (assert-true ,(unwalk-form value))))
 
 (def macro with-tests (&body body &environment env)
   (with-active-layers (with-tests)
@@ -53,7 +47,7 @@
            (gensyms (mapcar #'gensym-of generator-forms))
            (check-that-forms (collect-variable-references ast :type 'check-that-form)))
       (number-check-that-forms check-that-forms)
-      (generate-body ast generator gensyms check-that-forms))))
+      (generate-body ast generator gensyms (length check-that-forms)))))
 
 (defun number-check-that-forms (forms)
   "Numbers the check-that forms in FORMS."
@@ -61,23 +55,19 @@
         for i from 1
         do (setf (num-of form) i)))
 
-(def function generate-body (ast generator gensyms check-that-forms)
+(def function generate-body (ast generator gensyms n)
   "Generates the body of the with-tests form, given the walked AST,
    the generator that should be used to generate all of the values,
-   the gensyms that those generated values should be bound to, and all
-   of the check-that forms in the with-tests form."
-  (with-gensyms (gcode gargs)
-    (once-only (generator)
-      `(loop for ,*check-that-num* from 1 to ,(length check-that-forms)
-             for ,gcode in '(,@(mapcar #'source-of check-that-forms))
-             do (check-it% ,gcode
-                           ,generator
-                           (lambda (,gargs)
-                             (block ,*test-block*
-                               (destructuring-bind ,gensyms ,gargs
-                                 (declare (ignorable ,@gensyms))
-                                 ;; Substitute nil for all of
-                                 ;; the check-that forms that
-                                 ;; are not eq to the one form
-                                 ;; we are leaving.
-                                 ,(unwalk-form ast)))))))))
+   the gensyms that those generated values should be bound to, and the
+   number of check-that clauses in the body."
+  (with-gensyms (garg)
+    ;; If 1 <= *check-that-num <= N, the test with that specific
+    ;; number is ran. If *check-that-num = 0, all of the tests are
+    ;; ran.
+    (let ((*check-that-num* (gensym "CHECK-THAT-NUM")))
+      `(test-group (lambda (,garg ,*check-that-num*)
+                     (destructuring-bind ,gensyms ,garg
+                       (declare (ignorable ,@gensyms))
+                       ,(unwalk-form ast)))
+                   ,generator
+                   ,n))))

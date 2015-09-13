@@ -23,9 +23,10 @@
                          (:file "generators")
                          (:file "regenerate")
                          (:file "shrink")
-                         (:file "check-it"))
+                         (:file "check-it")
+                         (:file "walker"))
             :serial t))
-  :depends-on (:alexandria :closer-mop :optima :hu.dwim.walker)
+  :depends-on (:alexandria :closer-mop :optima :hu.dwim.walker :clunit)
   :in-order-to ((test-op (load-op :check-it-test)))
   :perform (test-op :after (op c)
                     (funcall
