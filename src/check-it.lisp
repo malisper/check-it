@@ -55,7 +55,13 @@
 (defun wrap-test-for-error-reporting (test)
   "Return a function capturing unhandled errors in TEST as data."
   (lambda (&rest args)
-    (handler-case (progn (apply test args) t)
+    (handler-case
+        ;; We want to prevent the assertion-passed from being
+        ;; signalled because we are running the assertions multiple
+        ;; times.
+        (handler-bind ((clunit::assertion-passed #'continue))
+          (apply test args)
+          t)
       (clunit::assertion-failed (c) c)
       (error (c) (make-instance 'reified-error :wrapped-error c)))))
 
@@ -183,7 +189,9 @@
         (clunit::*report-progress* nil))
     (let ((*random-state* (make-random-state t)))
       (loop for test-num from 1 to n do
-        (loop named trial-run repeat *num-trials* do
+        (loop named trial-run
+              finally (clunit::signal-assertion :pass)
+              repeat *num-trials* do
           (generate generator)
            ;; produce readable representation before anybody mutates this value
           (let ((stringified-value (format nil "~S" (cached-value generator)))
@@ -193,13 +201,14 @@
                        (format *check-it-output* "~&Shrunken failure case: ~A~%" shrunk)
                        (format *check-it-output* "~&Testing all assertions that fail this case:~%")
                        (handler-case
-                         (handler-bind ((clunit::assertion-failed (compose #'continue #'print-assertion)))
+                         (handler-bind ((clunit::assertion-failed (compose #'continue #'print-assertion))
+                                        (clunit::assertion-passed #'continue))
                            (funcall test shrunk 0))
                          (error (c)
                            (format *check-it-output*
                                    "~&Error ~A signaled. Aborting rest of test.~%"
                                    c)))
-                       (terpri))))
+                       (terpri *check-it-output*))))
               (typecase result
                 (clunit::assertion-failed
                  ;; Resignal the condition so other places can use it
