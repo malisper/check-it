@@ -199,7 +199,7 @@
             (flet ((do-shrink ()
                      (let ((shrunk (shrink generator (rcurry shrink-test test-num))))
                        (format *check-it-output* "~&Shrunken failure case: ~A~%" shrunk)
-                       (format *check-it-output* "~&Testing all assertions that fail this case:~%")
+                       (format *check-it-output* "~&Testing all assertions that fail the shrunken case:~%")
                        (handler-case
                          (handler-bind ((clunit::assertion-failed (compose #'continue #'print-assertion))
                                         (clunit::assertion-passed #'continue))
@@ -216,6 +216,7 @@
                  ;; not error, the debugger will not be entered if it
                  ;; isn't handled.
                  (signal result)
+                 (format *check-it-output* "~&Failed case: ~A~%" stringified-value)
                  (print-assertion result)
                  (do-shrink)
                  (return-from trial-run nil))
