@@ -2,6 +2,7 @@
 
 (defpackage :check-it
   (:use :cl :alexandria :optima :hu.dwim.walker :hu.dwim.def :contextl :clunit)
+  (:shadow #:run-test #:run-suite)
   (:export #:shrink
            #:shrink-and-trap-errors
 
@@ -14,7 +15,7 @@
 
            #:generator
            #:generate
-           
+
            #:regenerate
 
            #:int-generator
@@ -48,7 +49,7 @@
 
            #:def-generator
            #:def-genex-macro
-           
+
            #:wrap-test-for-error-reporting
            #:wrap-test-for-shrinking
 
@@ -57,7 +58,10 @@
            #:regression-case
            #:check-it
            #:with-tests
-           #:check-that))
+           #:check-that
+
+           #:deftest
+           #:defsuite))
 
 (in-package :check-it)
 
