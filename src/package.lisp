@@ -60,8 +60,8 @@
            #:with-tests
            #:check-that
 
-           #:deftest
-           #:defsuite))
+           #:run-test
+           #:run-suite))
 
 (in-package :check-it)
 
